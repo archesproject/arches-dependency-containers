@@ -53,8 +53,7 @@ networks:
     driver: bridge
 
 volumes:
-    couchdb-data-arches7.0:
-    couchdb-log-arches7.0:
+
     postgres-data-arches7.0:
     postgres-log-arches7.0:
     elasticsearch-data-arches7.0:
