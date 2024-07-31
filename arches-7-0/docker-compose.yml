@@ -2,7 +2,7 @@ version: '3.8'
 services:
     arches_db:
       container_name: postgres14-3_arches7-0
-      image: postgis/postgis:14-3.2
+      image: postgis/postgis:16-3.4
       volumes:
           - postgres-data-arches7.0:/var/lib/postgresql
           - postgres-log-arches7.0:/var/log/postgresql
@@ -20,7 +20,7 @@ services:
 
     arches_elasticsearch:
       container_name: elasticsearch8-3_arches7-0
-      image: elasticsearch:8.3.1
+      image: elasticsearch:8.14.1
       volumes:
         - elasticsearch-data-arches7.0:/usr/share/elasticsearch/data
       ports:
