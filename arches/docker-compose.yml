@@ -1,0 +1,114 @@
+# Not "arches": avoids sharing a compose project with checkouts named arches/.
+name: arches-shared
+
+# Shared Arches dependencies. Start only what a project needs, e.g.:
+#   docker compose up -d postgres18 elasticsearch9 pgadmin
+# See README.md for selecting these from arches-docker projects.
+
+x-postgres: &postgres
+  # postgis/postgis publishes amd64 only; runs emulated on Apple Silicon.
+  platform: linux/amd64
+  environment:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgis
+    POSTGRES_DB: postgres
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+  networks:
+    - arches-dev
+
+x-elasticsearch: &elasticsearch
+  environment:
+    discovery.type: single-node
+    xpack.security.enabled: "true"
+    # Dev disks are often >90% full; don't block shard allocation (incl. .security).
+    cluster.routing.allocation.disk.threshold_enabled: "false"
+    xpack.security.http.ssl.enabled: "false"
+    xpack.security.transport.ssl.enabled: "false"
+    path.repo: /usr/share/elasticsearch/snapshots
+    ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:?Set ELASTIC_PASSWORD in arches/.env (see .env.example)}
+  healthcheck:
+    test: ["CMD-SHELL", "curl -sf -u elastic:$$ELASTIC_PASSWORD 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null"]
+    interval: 15s
+    timeout: 10s
+    retries: 20
+    start_period: 30s
+  networks:
+    - arches-dev
+
+services:
+  postgres16:
+    <<: *postgres
+    container_name: arches-postgres16
+    image: postgis/postgis:16-3.5
+    volumes:
+      - postgres16-data:/var/lib/postgresql/data
+      - ./init-unix.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5416:5432"
+
+  postgres18:
+    <<: *postgres
+    container_name: arches-postgres18
+    image: postgis/postgis:18-3.6
+    # PG18 images keep data under /var/lib/postgresql/<major>/docker.
+    volumes:
+      - postgres18-data:/var/lib/postgresql
+      - ./init-unix.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:5418:5432"
+
+  elasticsearch8:
+    <<: *elasticsearch
+    container_name: arches-elasticsearch8
+    image: elasticsearch:8.19.23
+    volumes:
+      - elasticsearch8-data:/usr/share/elasticsearch/data
+      - elasticsearch8-snapshots:/usr/share/elasticsearch/snapshots
+    ports:
+      - "127.0.0.1:9208:9200"
+
+  elasticsearch9:
+    <<: *elasticsearch
+    container_name: arches-elasticsearch9
+    image: elasticsearch:9.5.5
+    volumes:
+      - elasticsearch9-data:/usr/share/elasticsearch/data
+      - elasticsearch9-snapshots:/usr/share/elasticsearch/snapshots
+    ports:
+      - "127.0.0.1:9209:9200"
+
+  pgadmin:
+    container_name: arches-pgadmin
+    image: dpage/pgadmin4:9
+    # Desktop mode: no pgAdmin login. Port is bound to localhost only.
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "127.0.0.1:5050:80"
+    networks:
+      - arches-dev
+
+networks:
+  arches-dev:
+    name: arches-dev
+    driver: bridge
+
+volumes:
+  postgres16-data:
+  postgres18-data:
+  elasticsearch8-data:
+  elasticsearch8-snapshots:
+  elasticsearch9-data:
+  elasticsearch9-snapshots:
+  pgadmin-data:
